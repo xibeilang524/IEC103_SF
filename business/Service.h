@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <sys/time.h>
 
 #include "IEC103Type.h"
 #include "../core/Inet.h"
@@ -91,6 +92,7 @@ protected:
 	 */
 	 std::vector<char> CmdFixedData(uint8_t code);
 
+
 	/*
 	 * @Desc: 构造召唤一级数据指令字符串
 	 * @Return: 召唤一级数据指令字符串
@@ -102,6 +104,12 @@ protected:
 	 * @Return: 召唤二级数据指令字符串
 	 */
 	 std::vector<char> CmdGetDataLv2();
+
+	/*
+	 * @Desc: 对时
+	 * @Return:
+	 */
+	 std::vector<char> CmdGetTimeStamp();
 
 	/*
 	 * @Desc: 构造总召唤指令字符串
@@ -148,12 +156,6 @@ protected:
 	 */
 	virtual void ParseASDU41(const char* buffer, int32_t count);
 
-	/*
-	 * @Desc: 解析ASDU42上送全遥信
-	 * @Param: buffer 开始地址
-	 * @Param: count 开始地址
-	 */
-	virtual void ParseASDU42(const char* buffer, int32_t count);
 
 	/*
 	 * @Desc: 解析ASDU50遥测上送
@@ -161,6 +163,17 @@ protected:
 	 * @Param: count 开始地址
 	 */
 	virtual void ParseASDU50(const char* buffer, int32_t count);
+
+
+
+	//遥信传输过程：主站以ASDU7发总查询命令
+	//           从站以ASDU42上送全遥信，以ASDU1上送变位遥信，以ASDU2上送事故报文
+	/*
+	 * @Desc: 解析ASDU42上送全遥信
+	 * @Param: buffer 开始地址
+	 * @Param: count 开始地址
+	 */
+	virtual void ParseASDU42(const char* buffer, int32_t count);
 
 	/*
 	 * @Desc: 解析ASDU1遥信变位上送
@@ -176,6 +189,9 @@ protected:
 	 */
 	virtual void ParseASDU2(const char* buffer, int32_t count);
 
+
+	//遥测传输过程：主站以ASDU21发总召唤命令
+	//           从站以ASDU10上送全遥测
 	/*
 	 * @Desc: 解析通用分类数据响应（读目录，读一个组的描述，读一个组的值）
 	 * @Param: buffer 开始地址
@@ -213,6 +229,7 @@ protected:
 	{
 		CMD_RESET_CON,
 		CMD_RESET_NUM,
+		CMD_RESET_TIMESTAMP,
 		CMD_GET_ALL,
 		CMD_GET_DATA_LV1,
 		CMD_GET_DATA_LV2,
@@ -245,6 +262,7 @@ protected:
 
 	uint8_t       m_ycGroupNum;
 	uint8_t       m_yxGroupNum;
+	uint8_t       m_timeStampAddr;
 };
 
 #endif /* SERVICE_H_ */

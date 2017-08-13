@@ -19,8 +19,6 @@ int main(int32_t argc, char *argv[])
 		return -1;
 	}
 
-	printf("%d\n",sizeof(StructTime4Byte));
-
 	app.Start();
 	app.Stop();
 

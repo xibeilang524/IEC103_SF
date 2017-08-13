@@ -29,6 +29,7 @@ enum ASDU_TYPE
 
 
 //标志位在报文中的位置
+#define CODE_POSI     4        //控制域
 #define TYP_POSI      6        //类型标识
 #define VSQ_POSI      7        //可变结构限定词
 #define COT_POSI      8        //传送原因
@@ -37,10 +38,15 @@ enum ASDU_TYPE
 #define INF_POSI      11       //信息序号
 #define DPI_POSI      12       //双点信息
 #define RET_POSI      13       //相对时间   表示装置启动到该元件动作的相对时间，毫秒
-#define FAN_POSI      14       //故障序号
+#define FAN_POSI      15       //故障序号
 #define ASDU_1_TIMESTAMP  13   //ASDU1中四字节时间起始位置
 #define ASDU_2_TIMESTAMP  17   //ASDU2中四字节时间起始位置
-
+#define GROUP_POSI        14   //组号
+#define TNTRY_POSI        15   //条目号
+#define KOD_POSI          16   //描述的类别
+#define GDD_POSI          17   //通用分类数据描述
+#define GID_POSI          20   //通用分类标识数据
+#define NGD_POSI          13   //通用分类数据集数目
 
 #define CONFIRM_07H  0x07
 #define CONFIRM_0BH  0x0B
@@ -58,16 +64,19 @@ enum ASDU_TYPE
 //功能码定义
 #define FNA_S2C_RESET_CON    0   //复位通信功能码
 #define FNA_S2C_RESET_NUM    7   //复位帧计数位功能码
-#define FNA_S2C_POSTDATA     3   //传送数据（发送/确认帧）
+#define FNA_S2C_POSTDATA_3   3   //传送数据（发送/确认帧）
+#define FNA_S2C_POSTDATA_4   4   //传送数据（发送/无回答帧）
 #define FNA_S2C_GETDATA_LV1  10  //召唤一级数据功能码
 #define FNA_S2C_GETDATA_LV2  11  //召唤二级数据功能码
 
 //ASDU号定义
-#define ASDU7_GETALL  7     // 总召唤
-#define ASDU21_GETGROUP  21 // 总召唤
+#define ASDU6_TIMESTAMP  6      // 对时
+#define ASDU7_GETALL     7      // 总召唤
+#define ASDU21_GETGROUP  21     // 总召唤
 
 //COT传送原因定义
-#define COT_S2C_GETALL_START 9     // 总查询(总召唤)的启动
+#define COT_S2C_TIMESTAMP    8      //时间同步
+#define COT_S2C_GETALL_START 9      //总查询(总召唤)的启动
 #define COT_S2C_GENERAL_READ 0x2A   //通用分类读命令
 
 //FUN定义
@@ -81,39 +90,54 @@ typedef struct {
 } IEC103CodeS2C;
 
 
-union UnionConvertFloat
+
+union UnionConvert4Byte
 {
-	float value;
+	unsigned int uValue;
+	float fValue;
 	char buf[4];
 };
 
-union UnionConvertUint
+union UnionConvert2Byte
 {
-	unsigned int value;
-	char buf[4];
-};
-
-union UnionConvertShort
-{
-	short value;
+	short  value;
+	ushort uValue;
 	char buf[2];
 };
 
 typedef struct
 {
-	uint16_t msec;             //毫秒
-	uint8_t  min:6,            //分钟
-			 res:1,
-		     iv:1;             //IV=0为有效  =1为无效
-	uint8_t  hour:7,           //小时
-		     su:1;             //su夏时制标志
-}StructTime4Byte;
+	//通用分类标识序号GIN
+	uint8_t groupNo;    //组号
+	uint8_t entryNo;    //条目号
 
-union UnionTime4Byte
+	//描述的类别KOD
+	uint8_t kod;        //1为实际值
+
+	//通用分类数据描述GDD
+	uint8_t datatype;   //数据类型
+	uint8_t datasize;   //数据宽度
+	uint8_t number:7,   //数目
+			cont:1;     //后续状态位
+}stDataUnit;     //通用分类数据单元
+
+
+typedef struct
 {
-	StructTime4Byte stTime4Byte;
-	char buf[4];
-};
+	uint16_t msec;            //毫秒
+	uint8_t  min:6,           //分钟
+			 res1:1,			  //备用
+		     iv:1;            //IV=0为有效  =1为无效
+	uint8_t  hour:7,          //小时
+		     su:1;            //su夏时制标志
+	uint8_t  day:5,            //日
+			 dayofweek:3;      //
+	uint8_t  month:4,           //月
+			 res2:4;            //备用
+	uint8_t  year:7,           //年
+			 res3:1;            //备用
+}stTime7Byte;
+
 
 
 // 带品质描述词的被测量(MEA)

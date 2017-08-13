@@ -44,7 +44,7 @@ Service::Service():m_net(NULL)
 	m_maxReSendTimes = 3;
 	m_sendInterval = 3;
 
-	m_iec103CodeS2C.fcv = 0;
+	m_iec103CodeS2C.fcv = FCV_1;
 	m_iec103CodeS2C.fcb = 0;
 
 	m_isResetConEnd = false;  //复位通信
@@ -52,9 +52,10 @@ Service::Service():m_net(NULL)
 	m_isGetAllEnd = false;    //总召唤
 
 	m_ycGroupNum = 0x09;
-	m_yxGroupNum = 0x00;
-
-	m_nextCmd = CMD_GENERAL_READ_YX_GROUP_VALUE;
+	m_yxGroupNum = 0x60;
+	m_timeStampAddr = 0xff;
+	m_clientAddr = 0x32;
+	m_nextCmd = CMD_GET_DATA_LV2;
 }
 
 Service::~Service()
@@ -127,6 +128,9 @@ bool Service::Write()
 	case CMD_RESET_CON:
 		strCmd = CmdResetCon();
 		break;
+	case CMD_RESET_TIMESTAMP:
+		strCmd = CmdGetTimeStamp();
+		break;
 	case CMD_GET_ALL:
 		strCmd = CmdGetAll();
 		break;
@@ -181,22 +185,17 @@ bool Service::Read()
 	{
 		printf("read[%s]: no data\n",g_cmdName[m_nextCmd]);
 		WARN("read[%s]: no data\n",g_cmdName[m_nextCmd]);
-
 		if(CMD_RESET_CON == m_nextCmd) //如果上一次指令是通信复位不做重发计数
 		{
 			return true;
 		}
+		reSendTimes++;
 	}
 	else
 	{
 		reSendTimes = 0;
 		DEBUG("read[%s] size %d :%s \n", g_cmdName[m_nextCmd], readSize,ToHexString(m_dataBuffer, readSize).c_str());
-//		if(START_68H == m_dataBuffer[0])
-//			DEBUG("{code=%d, ASDU=%d, FUN=%d, INF=%d} \n",
-//					(uint8_t)m_dataBuffer[4],
-//					(uint8_t)m_dataBuffer[6],
-//					(uint8_t)m_dataBuffer[10],
-//					(uint8_t)m_dataBuffer[11]);
+
 		//TODO:测试时使用
 		printf("size: %d  read[%s] : ",readSize,g_cmdName[m_nextCmd]);
 		printf("%s \n", ToHexString(m_dataBuffer, readSize).c_str());
@@ -279,9 +278,13 @@ bool Service::ParseFixedData(const char* pData, int32_t dataLen)
 	int acd = pData[2] & ACD_1;
 	if(acd)
 	{
-		m_iec103CodeS2C.fcb = m_iec103CodeS2C.fcb ^ FCB_1;
+		m_iec103CodeS2C.fcb = m_iec103CodeS2C.fcb ^ FCB_1;   //把FCB位取反
 		m_iec103CodeS2C.fcv = FCV_1;
 		m_nextCmd = CMD_GET_DATA_LV1;
+	}
+	else
+	{
+		m_iec103CodeS2C.fcv = (m_iec103CodeS2C.fcv | FCV_1) ^ FCV_1;  //把FCV位置0
 	}
 
 	return true;
@@ -376,6 +379,50 @@ std::vector<char> Service::CmdFixedData(uint8_t code)
 	return buffer;
 }
 
+
+// 对时
+std::vector<char> Service::CmdGetTimeStamp()
+{
+	std::vector<char> buffer(21);
+
+	struct timeval cur_t;
+	gettimeofday(&cur_t,NULL);
+	struct tm *p;
+	p = localtime(&cur_t.tv_sec);
+	stTime7Byte timeByte;
+	timeByte.year = p->tm_year + 1900;
+	timeByte.month = p->tm_mon + 1;
+	timeByte.day = p->tm_mday;
+	timeByte.hour = p->tm_hour;
+	timeByte.min = p->tm_min;
+	timeByte.msec = cur_t.tv_usec/1000;
+	//printf("time_now:%d%d%d%d%d%d.%ld\n", 1900+p->tm_year, 1+p->tm_mon, p->tm_mday, p->tm_hour, p->tm_min, p->tm_sec, cur_t.tv_usec/1000);
+
+	buffer[0] = START_68H;
+	buffer[1] = 0x0f;
+	buffer[2] = 0x0f;
+	buffer[3] = START_68H;
+	buffer[4] = PRA_1|m_iec103CodeS2C.fcb|m_iec103CodeS2C.fcv|FNA_S2C_POSTDATA_4;
+	buffer[5] = m_timeStampAddr;
+	buffer[6] = ASDU6_TIMESTAMP;
+	buffer[7] = 0x81;  //vsq
+	buffer[8] = COT_S2C_TIMESTAMP;
+	buffer[9] = m_timeStampAddr;   //ASDU_ADDR   0xFF=广播方式    装置地址=点对点方式
+	buffer[10] = FUN_GETALL;
+	buffer[11] = 0x00;
+	buffer[12] = ((char*)(&timeByte))[0];
+	buffer[13] = ((char*)(&timeByte))[1];
+	buffer[14] = ((char*)(&timeByte))[2];
+	buffer[15] = ((char*)(&timeByte))[3];
+	buffer[16] = ((char*)(&timeByte))[4];
+	buffer[17] = ((char*)(&timeByte))[5];
+	buffer[18] = ((char*)(&timeByte))[6];
+	buffer[19] = SumCheck( &(buffer[4]), (uint8_t)buffer[1] );
+	buffer[20] = END_16H;
+	return buffer;
+}
+
+
 // 总召唤
 std::vector<char> Service::CmdGetAll()
 {
@@ -389,11 +436,11 @@ std::vector<char> Service::CmdGetAll()
 	buffer[1] = 0x09;
 	buffer[2] = 0x09;
 	buffer[3] = START_68H;
-	buffer[4] = PRA_1|m_iec103CodeS2C.fcb|m_iec103CodeS2C.fcv|FNA_S2C_POSTDATA;
+	buffer[4] = PRA_1|m_iec103CodeS2C.fcb|m_iec103CodeS2C.fcv|FNA_S2C_POSTDATA_3;
 	buffer[5] = m_clientAddr;
 	buffer[6] = ASDU7_GETALL;
-	buffer[7] = 0x81;  //vsq
-	buffer[8] = COT_S2C_GETALL_START;
+	buffer[7] = 0x81;                  //vsq
+	buffer[8] = COT_S2C_GETALL_START;  //总召唤
 	buffer[9] = m_clientAddr;
 	buffer[10] = FUN_GETALL;  // FUN
 	buffer[11] = 0x00;
@@ -415,7 +462,7 @@ std::vector<char> Service::CmdGetGroupValue(uint8_t groupNum)
 	buffer[1] = 0x0D;
 	buffer[2] = 0x0D;
 	buffer[3] = START_68H;
-	buffer[4] = PRA_1|m_iec103CodeS2C.fcb|m_iec103CodeS2C.fcv|FNA_S2C_POSTDATA;
+	buffer[4] = PRA_1|m_iec103CodeS2C.fcb|m_iec103CodeS2C.fcv|FNA_S2C_POSTDATA_3;
 	buffer[5] = m_clientAddr;
 	buffer[6] = ASDU21_GETGROUP;
 	buffer[7] = 0x81;  //vsq
@@ -553,27 +600,21 @@ void Service::ParseASDU42(const char* buffer, int32_t count)
 	uint8_t clientAddr = buffer[ADDR_POSI];
 	uint8_t fun = buffer[FUN_POSI];;
 	uint8_t inf = buffer[INF_POSI];
-	uint8_t scdNum = vsq & 0x7F; 	// 信息元个数
-    bool bValue = true;
-    char addr[100] = {0}; 			 //103地址
-    std::vector<Tag> vecTag;
-    for(int i = 0; i < scdNum; ++i)
-    {
-    	memset(addr, 0, sizeof(addr));
-    	//信息元 diq
-		uint8_t diq = buffer[DPI_POSI + i]; //品质描述的双点信息
+	uint8_t dpiNum = vsq & 0x7F; 	// 信息元个数
 
-		if(diq & 0xfc) //当前值无效  diq为2位数组，值=0/3为无意义，值=1为分，值=2为合
+    std::vector<Tag> vecTag;
+    for(int i = 0; i < dpiNum; ++i)
+    {
+		uint8_t dpi = buffer[DPI_POSI + i]; //品质描述的双点信息
+
+		if(!((dpi == 0x01) || (dpi == 0x02))) //当前值无效  dpi为2位数组，值=0/3为无意义，值=1为分，值=2为合
 		{
 			continue;
 		}
 
-		if(0x01 & diq)
-		{
-			bValue = false;  //true为合，false为分
-		}
-
+		char addr[100] = {0}; 			 //103地址
 		sprintf(addr, "%d_%d%03d", clientAddr, fun, inf); //构造103地址
+
 		Tag tagTemp;
 		tagTemp.ZeroTag();
 		tagTemp.dataType = TYPE_BOOL;
@@ -582,7 +623,7 @@ void Service::ParseASDU42(const char* buffer, int32_t count)
 		{
 			uint16_t addrLen = (strGlgAddr.length() > sizeof(tagTemp.pName))? sizeof(tagTemp.pName): strGlgAddr.length();
 			memcpy(tagTemp.pName, strGlgAddr.c_str(), addrLen);
-			sprintf(tagTemp.pdata, "%d", bValue);
+			sprintf(tagTemp.pdata, "%d", (dpi - 1) & 0x01);
 			vecTag.push_back(tagTemp);
 		}
     }
@@ -655,21 +696,22 @@ void Service::ParseASDU50(const char* buffer, int32_t count)
  */
 void Service::ParseASDU1(const char* buffer, int32_t count)
 {
+	uint8_t code = buffer[CODE_POSI];
 	uint8_t clientAddr = buffer[ADDR_POSI];
 	uint8_t fun = buffer[FUN_POSI];
 	uint8_t inf = buffer[INF_POSI];
-	uint8_t dpi = buffer[DPI_POSI] & 0x03;
-	bool bValue = false;
+
+
 	char addr[100] = {0}; //103地址
-
-	UnionTime4Byte unionTime4Byte;
-	memcpy(unionTime4Byte.buf, buffer + ASDU_1_TIMESTAMP, 4);  //取四字节时间
-	printf("%d:%d:%d\n",unionTime4Byte.stTime4Byte.hour,unionTime4Byte.stTime4Byte.min,unionTime4Byte.stTime4Byte.msec);
-
 	std::vector<Tag> vecTag;
-	if(2 == dpi)
+	stTime7Byte Time4Byte;
+	memcpy(&Time4Byte, buffer + ASDU_1_TIMESTAMP, 4);  //取四字节时间
+	printf("%d:%d:%d\n",Time4Byte.hour,Time4Byte.min,Time4Byte.msec);
+
+	if(code & ACD_1)
 	{
-		bValue = true;  //true为合，false为分
+		m_iec103CodeS2C.fcb = m_iec103CodeS2C.fcb ^ FCB_1;
+		m_iec103CodeS2C.fcv = FCV_1;
 	}
 
 	sprintf(addr, "%d_%d%03d", clientAddr, fun, inf); //构造103地址
@@ -681,7 +723,7 @@ void Service::ParseASDU1(const char* buffer, int32_t count)
 	{
 		uint16_t addrLen = (strGlgAddr.length() > sizeof(tagTemp.pName))? sizeof(tagTemp.pName): strGlgAddr.length();
 		memcpy(tagTemp.pName, strGlgAddr.c_str(), addrLen);
-		sprintf(tagTemp.pdata, "%d", bValue);
+		sprintf(tagTemp.pdata, "%d", (buffer[DPI_POSI] - 1) & 0x01);  //双点描述 dpi=1为分，=2为和   0和3无意义
 		vecTag.push_back(tagTemp);
 		std::cout<<"save Mem database tagName ="<<tagTemp.pName<<" tagValue ="<<tagTemp.pdata<<std::endl;
 		bool rs =MemCache::GetInstance()->WritePointsValue_V(vecTag); //更新点到内存数据库
@@ -696,24 +738,30 @@ void Service::ParseASDU1(const char* buffer, int32_t count)
  */
 void Service::ParseASDU2(const char* buffer, int32_t count)
 {
+	uint8_t code = buffer[CODE_POSI];
 	uint8_t clientAddr = buffer[ADDR_POSI];
 	uint8_t fun = buffer[FUN_POSI];
 	uint8_t inf = buffer[INF_POSI];
 	uint8_t dpi = buffer[DPI_POSI] & 0x03;
 
-	UnionConvertShort unionConvert;
+	UnionConvert2Byte unionConvert;
 	memcpy(unionConvert.buf,buffer + RET_POSI, 2);
 	short ret = unionConvert.value;
 	memcpy(unionConvert.buf,buffer + FAN_POSI, 2);
 	short fan = unionConvert.value;
 	printf("ret = %d  fan = %d\n",ret,fan);
-
 	bool bValue = false;
 	char addr[100] = {0}; //103地址
 
-	UnionTime4Byte unionTime4Byte;
-	memcpy(unionTime4Byte.buf, buffer + ASDU_2_TIMESTAMP, 4);  //取四字节时间
-	printf("%d:%d:%d\n",unionTime4Byte.stTime4Byte.hour,unionTime4Byte.stTime4Byte.min,unionTime4Byte.stTime4Byte.msec);
+	if(code & ACD_1)
+	{
+		m_iec103CodeS2C.fcb = m_iec103CodeS2C.fcb ^ FCB_1;
+		m_iec103CodeS2C.fcv = FCV_1;
+	}
+
+	stTime7Byte Time4Byte;
+	memcpy(&Time4Byte, buffer + ASDU_2_TIMESTAMP, 4);  //取四字节时间
+	printf("%d:%d:%d\n",Time4Byte.hour,Time4Byte.min,Time4Byte.msec);
 	std::vector<Tag> vecTag;
 	if(2 == dpi)
 	{
@@ -885,27 +933,29 @@ void Service::ParseASDU10(const char* buffer, int32_t count)
 
 void Service::ParseASDU10AllValue(const char* buffer, int32_t count)
 {
-	uint8_t clientAddr = buffer[5];
-	uint8_t ngdNum = buffer[13] & 0x3F; // 返回的数据个数
-	uint16_t index = 0;//数据的偏移量
+	uint8_t code = buffer[CODE_POSI];
+	uint8_t clientAddr = buffer[ADDR_POSI];
+	uint8_t ngdNum = buffer[NGD_POSI] & 0x3F; // 返回的数据个数
+	uint16_t offset = 0;                      //数据的偏移量
 	std::vector<Tag> vecTag;
-	char addr[100] = {0};
+
+	if(code & ACD_1)
+	{
+		m_iec103CodeS2C.fcb = m_iec103CodeS2C.fcb ^ FCB_1;
+		m_iec103CodeS2C.fcv = FCV_1;
+	}
+
 	for(int i = 0; i < ngdNum; ++i)
 	{
-		memset(addr, 0, sizeof(addr));
-		uint8_t gin_0 = buffer[14 + index];           // 组号
-		uint8_t gin_1 = buffer[15 + index];           // 条目号
-		uint8_t type = buffer[17 + index];            //数据类型
-		uint8_t wideLen  = buffer[18 + index];        //数据每个元素宽度
-		uint8_t valueNum  = buffer[19 + index] &0x7F; //数据元素数目
-		uint8_t valueLen = wideLen * valueNum;        //数据占用多少字节
-		char valueStr[20] = {0};
-		memcpy(valueStr, &buffer[20 + index], valueLen);
+		stDataUnit dataUnit;
+		memcpy(&dataUnit, buffer + GROUP_POSI + offset, sizeof(stDataUnit));
 
-		sprintf(addr, "%d_%d%03d", clientAddr, gin_0, gin_1); //构造103地址
+		char addr[100] = {0};
+		memset(addr, 0, sizeof(addr));
+		sprintf(addr, "%d_%d%03d", clientAddr, dataUnit.groupNo, dataUnit.entryNo); //构造103地址
 
 		//不是遥信或者遥测数据
-		if(m_ycGroupNum != gin_0 && m_yxGroupNum != gin_0)
+		if(m_ycGroupNum != dataUnit.groupNo && m_yxGroupNum != dataUnit.groupNo)
 		{
 			break;
 		}
@@ -922,66 +972,61 @@ void Service::ParseASDU10AllValue(const char* buffer, int32_t count)
 		Tag tagTemp;
 		tagTemp.ZeroTag();
 
-
-		if(12 == type) //带品质描述值
+		UnionConvert4Byte convertUnion4Byte;
+		UnionConvert2Byte convertUnion2Byte;
+		switch(dataUnit.datatype)
 		{
+		case 3:                                  //2字节无符号整形
+			tagTemp.dataType = TYPE_LONG;
+			memcpy(convertUnion2Byte.buf, buffer + GID_POSI + offset, dataUnit.datasize);
+			sprintf(tagTemp.pdata, "%u", convertUnion2Byte.uValue);
+			break;
+
+		case 7:                                   //短实数
+			tagTemp.dataType = TYPE_FLOAT;
+			memcpy(convertUnion4Byte.buf, buffer + GID_POSI + offset, dataUnit.datasize);
+			sprintf(tagTemp.pdata, "%.4f", convertUnion4Byte.fValue);
+			break;
+
+		case 9:                                   //双点描述 dpi=1为分，=2为和   0和3无意义
+			tagTemp.dataType = TYPE_BOOL;
+			if(!(((buffer + GID_POSI + offset)[0] == 0x01) || ((buffer + GID_POSI + offset)[0] == 0x02)))
+			{
+				break;
+			}
+			sprintf(tagTemp.pdata, "%d", ((buffer + GID_POSI + offset)[0] - 1) & 0x01);
+			break;
+
+		case 10:                               //单点描述 siq=0为分，=1为和
+			tagTemp.dataType = TYPE_BOOL;
+			if(!(((buffer + GID_POSI + offset)[0] == 0x00) || ((buffer + GID_POSI + offset)[0] == 0x01)))
+			{
+				break;
+			}
+			sprintf(tagTemp.pdata, "%d", (buffer + GID_POSI + offset)[0] & 0x01);
+			break;
+
+		case 12:                           //带品质描述词的被测值
 			tagTemp.dataType = TYPE_FLOAT;
 			//信息元
-			uint8_t qds = valueStr[0];
-			uint16_t tmpValue = valueStr[0];
-			float  value = 0.0f;
-			if(qds & 0x02) //当前值无效
-			{
-				continue;
-			}
-
-			bool flag = (tmpValue & 0x8000) ? true: false; //是否为负数
-			tmpValue = ~tmpValue;
-			tmpValue &= 0xfff8; //品质位置0
-			tmpValue &= 0x7ff8; //符号位置0
-			tmpValue >>= 3;
-			tmpValue += 1;
-			value = (flag?(-tmpValue):tmpValue)*GetRateByPrivateAddr(addr);
-			sprintf(tagTemp.pdata, "%.4f", value);
-		}
-		else if(9 == type)//双点信息
-		{
-			tagTemp.dataType = TYPE_BOOL;
-			uint8_t dpi = valueStr[0] & 0x03;
-			bool bValue = false;
-			if(2 == dpi)
-			{
-				bValue = true;  //true为合，false为分
-			}
-			sprintf(tagTemp.pdata, "%d", bValue);
-		}
-		else if(7 == type) //R32.23，IEEE标准754短实数
-		{
-			tagTemp.dataType = TYPE_FLOAT;
-			UnionConvertFloat convertUnion;
-			memcpy(convertUnion.buf,valueStr,4);
-			sprintf(tagTemp.pdata, "%.4f", convertUnion.value);
-		}
-		else if(3 == type)// 无符号整数
-		{
-			tagTemp.dataType = TYPE_LONG;
-			UnionConvertUint convertUnion;
-			memcpy(convertUnion.buf,valueStr,4);
-			sprintf(tagTemp.pdata, "%u", convertUnion.value);
-		}
-		else if(10 == type)//单点信息
-		{
-			tagTemp.dataType = TYPE_BOOL;
-			uint8_t siq = valueStr[0];
-			bool bValue = false;
-			if(0x01 & siq)
-			{
-				bValue = true;  //true为合，false为分
-			}
-			sprintf(tagTemp.pdata, "%d", bValue);
-		}
-		else
-		{
+//			uint8_t qds = valueStr[0];
+//			uint16_t tmpValue = valueStr[0];
+//			float  value = 0.0f;
+//			if(qds & 0x02) //当前值无效
+//			{
+//				continue;
+//			}
+//
+//			bool flag = (tmpValue & 0x8000) ? true: false; //是否为负数
+//			tmpValue = ~tmpValue;
+//			tmpValue &= 0xfff8; //品质位置0
+//			tmpValue &= 0x7ff8; //符号位置0
+//			tmpValue >>= 3;
+//			tmpValue += 1;
+//			value = (flag?(-tmpValue):tmpValue)*GetRateByPrivateAddr(addr);
+//			sprintf(tagTemp.pdata, "%.4f", value);
+			break;
+		default:
 			break;
 		}
 
@@ -990,12 +1035,6 @@ void Service::ParseASDU10AllValue(const char* buffer, int32_t count)
 //		vecTag.push_back(tagTemp);
 //		MemCache::GetInstance()->WritePointsValue_V(vecTag); //更新点到内存数据库
 
-		if(index > count - 14 - 2) //不应该发生这种情况
-		{
-			WARN("data parse error:%s", ToHexString(buffer, count).c_str());
-			return;
-		}
-
+		offset = offset + dataUnit.datasize + 6;  //通用分类数据单元占6个字节
 	}
-
 }
