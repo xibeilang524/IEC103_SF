@@ -12,15 +12,15 @@
 
 int main(int32_t argc, char *argv[])
 {
-	IEC103Manager app;
+	IEC103Manager manager;
 
-	if(!app.Init())
+	if(!manager.Init())
 	{
 		return -1;
 	}
 
-	app.Start();
-	app.Stop();
+	manager.Start();
+	manager.Stop();
 
 	return 0;
 }
