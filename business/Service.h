@@ -118,6 +118,24 @@ protected:
 	 std::vector<char> CmdResetEventAlarm();
 
 	/*
+	 * @Desc: 事件告警复归
+	 * @Return:
+	 */
+	 std::vector<char> CmdResetEventAlarm();
+
+	/*
+	 * @Desc: 定值下传
+	 * @Return:
+	 */
+	 std::vector<char> CmdSettingDownload();
+
+	/*
+	 * @Desc: 定值修改
+	 * @Return:
+	 */
+	 std::vector<char> CmdSettingModify();
+
+	/*
 	 * @Desc: 构造总召唤指令字符串
 	 * @Return: 总召唤指令字符串
 	 */
@@ -129,46 +147,53 @@ protected:
 	 * @Param: groupNum要读的组号
 	 * @Return: 通用分类读命令字符串
 	 */
-	 std::vector<char> CmdGetGroupValue(uint8_t groupNum);
+	 std::vector<char> CmdGetGroupValue(uint8_t groupNo);
+
+	/*
+	 * @Desc: 构造通用分类读命令（读一个组所有条目的值）
+	 * @Param: groupNum要读的组号
+	 * @Return: 通用分类读命令字符串
+	 */
+	 std::vector<char> CmdGetEntryValue(uint8_t groupNo, uint8_t entryNo);
 
 	/*
 	 * @Desc: 生成较验码
-	 * @Param: buffer 开始地址
-	 * @Param: count 开始地址
+	 * @Param: packet 开始地址
+	 * @Param: length 开始地址
 	 * @Return: 较验码
 	 */
-	 uint8_t SumCheck( const char* buffer, int32_t count );
+	 uint8_t SumCheck( const char* packet, int32_t length );
 
 //解析客户端上送的ASDU数据
 protected:
 	/*
 	 * @Desc: 解析ASDU44上送全遥信
-	 * @Param: buffer 开始地址
-	 * @Param: count 开始地址
+	 * @Param: packet 开始地址
+	 * @Param: length 开始地址
 	 */
-	 virtual void ParseASDU44(const char* buffer, int32_t count);
+	 virtual void ParseASDU44(const char* packet, int32_t length);
 
 	/*
 	 * @Desc: 解析ASDU40上送变位遥信
-	 * @Param: buffer 开始地址
-	 * @Param: count 开始地址
+	 * @Param: packet 开始地址
+	 * @Param: length 开始地址
 	 */
-	virtual void ParseASDU40(const char* buffer, int32_t count);
+	virtual void ParseASDU40(const char* packet, int32_t length);
 
 	/*
 	 * @Desc: 解析ASDU44上送SOE
-	 * @Param: buffer 开始地址
-	 * @Param: count 开始地址
+	 * @Param: packet 开始地址
+	 * @Param: length 开始地址
 	 */
-	virtual void ParseASDU41(const char* buffer, int32_t count);
+	virtual void ParseASDU41(const char* packet, int32_t length);
 
 
 	/*
 	 * @Desc: 解析ASDU50遥测上送
-	 * @Param: buffer 开始地址
-	 * @Param: count 开始地址
+	 * @Param: packet 开始地址
+	 * @Param: length 开始地址
 	 */
-	virtual void ParseASDU50(const char* buffer, int32_t count);
+	virtual void ParseASDU50(const char* packet, int32_t length);
 
 
 
@@ -176,36 +201,36 @@ protected:
 	//           从站以ASDU42上送全遥信，以ASDU1上送变位遥信，以ASDU2上送事故报文
 	/*
 	 * @Desc: 解析ASDU42上送全遥信
-	 * @Param: buffer 开始地址
-	 * @Param: count 开始地址
+	 * @Param: packet 开始地址
+	 * @Param: length 开始地址
 	 */
-	virtual void ParseASDU42(const char* buffer, int32_t count);
+	virtual void ParseASDU42(const char* packet, int32_t length);
 
 	/*
 	 * @Desc: 解析ASDU1遥信变位上送
-	 * @Param: buffer 开始地址
-	 * @Param: count 开始地址
+	 * @Param: packet 开始地址
+	 * @Param: length 开始地址
 	 */
-	virtual void ParseASDU1(const char* buffer, int32_t count);
+	virtual void ParseASDU1(const char* packet, int32_t length);
 
 	/*
 	 * @Desc: 解析ASDU2事故报文上送
-	 * @Param: buffer 开始地址
-	 * @Param: count 开始地址
+	 * @Param: packet 开始地址
+	 * @Param: length 开始地址
 	 */
-	virtual void ParseASDU2(const char* buffer, int32_t count);
+	virtual void ParseASDU2(const char* packet, int32_t length);
 
 
 	//遥测传输过程：主站以ASDU21发总召唤命令
 	//           从站以ASDU10上送全遥测
 	/*
 	 * @Desc: 解析通用分类数据响应（读目录，读一个组的描述，读一个组的值）
-	 * @Param: buffer 开始地址
-	 * @Param: count 开始地址
+	 * @Param: packet 开始地址
+	 * @Param: length 开始地址
 	 */
-	virtual void ParseASDU10(const char* buffer, int32_t count);
+	virtual void ParseASDU10(const char* packet, int32_t length);
 private:
-	virtual void ParseASDU10AllValue(const char* buffer, int32_t count);
+	virtual void ParseASDU10AllValue(const char* packet, int32_t length);
 
 protected:
 	/*
@@ -230,6 +255,7 @@ private:
 	 */
 	bool StartBreakHeart();
     static void * ThreadFunc(void *arg);
+<<<<<<< HEAD
 protected:
 	enum CMD_SEND
 	{
@@ -243,6 +269,9 @@ protected:
 		CMD_GENERAL_READ_YX_GROUP_VALUE,
 		CMD_GENERAL_READ_YC_GROUP_VALUE,
 	};
+=======
+
+>>>>>>> d5145ec17abff158ad4ef64531721a60fadcab11
 protected:
 	struct Point103
 	{
@@ -261,7 +290,7 @@ protected:
 	std::map<std::string, Point103> m_pointAddrMap;  //<103点地址， 61850地址> 103地址和全局地址映射
 	uint16_t      m_maxReSendTimes;       //重发次数
 	uint16_t      m_sendInterval;         //重新发送间隔
-	char          m_dataBuffer[MAX_SIZE]; //读到的数据
+	char          m_datapacket[MAX_SIZE]; //读到的数据
 
 	bool          m_isResetConEnd;  //复位通信
 	bool          m_isResetNumEnd;  //复位帧计数位
@@ -269,6 +298,9 @@ protected:
 
 	uint8_t       m_ycGroupNum;
 	uint8_t       m_yxGroupNum;
+
+	uint8_t       m_GroupNo;
+	uint8_t		  m_EntryNo;
 	uint8_t       m_timeStampAddr;
 };
 

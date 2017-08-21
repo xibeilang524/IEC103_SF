@@ -17,7 +17,7 @@
 
 SerialService::SerialService():Service()
 {
-	memset(m_dataBuffer, 0, sizeof(m_dataBuffer));
+	memset(m_datapacket, 0, sizeof(m_datapacket));
 
 	m_iec103CodeS2C.fcv = 0;
 	m_iec103CodeS2C.fcb = 0;
@@ -122,9 +122,9 @@ bool SerialService::Write()
 
 bool SerialService::Read()
 {
-	memset(m_dataBuffer, 0, sizeof(m_dataBuffer));
+	memset(m_datapacket, 0, sizeof(m_datapacket));
 	static uint16_t reSendTimes = 0; //同一指令从发次数（不包括复位通信）
-	int readSize = m_net->Read(m_dataBuffer, sizeof(m_dataBuffer));
+	int readSize = m_net->Read(m_datapacket, sizeof(m_datapacket));
 	if(-1 == readSize)
 	{
 		return false;
@@ -133,7 +133,7 @@ bool SerialService::Read()
 	{
 		//TODO:测试时使用
 		printf("read[%s]: ",g_cmdName[m_nextCmd]);
-		printf("%s \n", ToHexString(m_dataBuffer, strlen(m_dataBuffer)).c_str());
+		printf("%s \n", ToHexString(m_datapacket, strlen(m_datapacket)).c_str());
 	}
 	else if(0 == readSize)//未读到数据
 	{
@@ -150,17 +150,17 @@ bool SerialService::Read()
 	else
 	{
 		reSendTimes = 0;
-		DEBUG("read[%s]:%s \n", g_cmdName[m_nextCmd], ToHexString(m_dataBuffer, readSize).c_str());
-		if(START_68H == m_dataBuffer[0])
-		DEBUG("{code=%d, ASDU=%d, FUN=%d, INF=%d} \n", (uint8_t)m_dataBuffer[4], (uint8_t)m_dataBuffer[6], (uint8_t)m_dataBuffer[10], (uint8_t)m_dataBuffer[11]);
+		DEBUG("read[%s]:%s \n", g_cmdName[m_nextCmd], ToHexString(m_datapacket, readSize).c_str());
+		if(START_68H == m_datapacket[0])
+		DEBUG("{code=%d, ASDU=%d, FUN=%d, INF=%d} \n", (uint8_t)m_datapacket[4], (uint8_t)m_datapacket[6], (uint8_t)m_datapacket[10], (uint8_t)m_datapacket[11]);
 		//TODO:测试时使用
 		printf("read[%s]: ",g_cmdName[m_nextCmd]);
-		printf("%s \n", ToHexString(m_dataBuffer, readSize).c_str());
-		if(START_68H == m_dataBuffer[0])
-		printf("{code=%d, ASDU=%d, FUN=%d, INF=%d} \n", (uint8_t)m_dataBuffer[4], (uint8_t)m_dataBuffer[6], (uint8_t)m_dataBuffer[10], (uint8_t)m_dataBuffer[11]);
-		if(!ParseRecvData(m_dataBuffer, readSize))
+		printf("%s \n", ToHexString(m_datapacket, readSize).c_str());
+		if(START_68H == m_datapacket[0])
+		printf("{code=%d, ASDU=%d, FUN=%d, INF=%d} \n", (uint8_t)m_datapacket[4], (uint8_t)m_datapacket[6], (uint8_t)m_datapacket[10], (uint8_t)m_datapacket[11]);
+		if(!ParseRecvData(m_datapacket, readSize))
 		{
-			WARN("recv invalied data: %s\n", ToHexString(m_dataBuffer, readSize).c_str());
+			WARN("recv invalied data: %s\n", ToHexString(m_datapacket, readSize).c_str());
 			WarningLib::GetInstance()->WriteWarn2(WARNING_LV0, "recv invalied data");
 		}
 		return true;

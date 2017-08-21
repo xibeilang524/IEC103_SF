@@ -40,7 +40,7 @@ uint16_t Service::m_heartInterval=60;
 
 Service::Service():m_net(NULL)
 {
-	memset(m_dataBuffer, 0, sizeof(m_dataBuffer));
+	memset(m_datapacket, 0, sizeof(m_datapacket));
 	m_maxReSendTimes = 3;
 	m_sendInterval = 3;
 
@@ -55,7 +55,8 @@ Service::Service():m_net(NULL)
 	m_yxGroupNum = 0x60;
 	m_timeStampAddr = 0xff;
 	m_clientAddr = 0x32;
-	m_nextCmd = CMD_GET_DATA_LV2;
+
+	m_nextCmd = CMD_RESET_EVENT;
 }
 
 Service::~Service()
@@ -132,6 +133,13 @@ bool Service::Write()
 		strCmd = CmdSetTimeStamp();
 		break;
 	case CMD_RESET_EVENT:
+		strCmd = CmdResetEventAlarm();
+		break;
+	case CMD_SETTING_DOWNLOAD:
+		strCmd = CmdSettingDownload();
+		break;
+	case CMD_SETTING_MODIFY:
+		strCmd = CmdSettingModify();
 		break;
 	case CMD_GET_ALL:
 		strCmd = CmdGetAll();
@@ -141,6 +149,9 @@ bool Service::Write()
 		break;
 	case CMD_GET_DATA_LV2:
 		strCmd = CmdGetDataLv2();
+		break;
+	case CMD_GET_SINGLE_SETTING_VALUE:
+		strCmd = CmdGetEntryValue(m_GroupNo,m_EntryNo);
 		break;
 	case CMD_GENERAL_READ_YX_GROUP_VALUE:
 		strCmd = CmdGetGroupValue(m_yxGroupNum);
@@ -170,9 +181,9 @@ bool Service::Write()
 
 bool Service::Read()
 {
-	memset(m_dataBuffer, 0, sizeof(m_dataBuffer));
+	memset(m_datapacket, 0, sizeof(m_datapacket));
 	static uint16_t reSendTimes = 0; //同一指令从发次数（不包括复位通信）
-	int readSize = m_net->Read(m_dataBuffer, sizeof(m_dataBuffer));
+	int readSize = m_net->Read(m_datapacket, sizeof(m_datapacket));
 	if(-1 == readSize)
 	{
 		return false;
@@ -181,7 +192,7 @@ bool Service::Read()
 	{
 		//TODO:测试时使用
 		printf("read[%s]: ",g_cmdName[m_nextCmd]);
-		printf("%s \n", ToHexString(m_dataBuffer, strlen(m_dataBuffer)).c_str());
+		printf("%s \n", ToHexString(m_datapacket, strlen(m_datapacket)).c_str());
 	}
 	else if(0 == readSize)//未读到数据
 	{
@@ -196,15 +207,15 @@ bool Service::Read()
 	else
 	{
 		reSendTimes = 0;
-		DEBUG("read[%s] size %d :%s \n", g_cmdName[m_nextCmd], readSize,ToHexString(m_dataBuffer, readSize).c_str());
+		DEBUG("read[%s] size %d :%s \n", g_cmdName[m_nextCmd], readSize,ToHexString(m_datapacket, readSize).c_str());
 
 		//TODO:测试时使用
 		printf("size: %d  read[%s] : ",readSize,g_cmdName[m_nextCmd]);
-		printf("%s \n", ToHexString(m_dataBuffer, readSize).c_str());
+		printf("%s \n", ToHexString(m_datapacket, readSize).c_str());
 
-		if(!ParseRecvData(m_dataBuffer, readSize))
+		if(!ParseRecvData(m_datapacket, readSize))
 		{
-			WARN("recv invalied data: %s\n", ToHexString(m_dataBuffer, readSize).c_str());
+			WARN("recv invalied data: %s\n", ToHexString(m_datapacket, readSize).c_str());
 		}
 		return true;
 	}
@@ -372,20 +383,20 @@ std::vector<char> Service::CmdGetDataLv2()
 // 固定长度报文
 std::vector<char> Service::CmdFixedData(uint8_t code)
 {
-	std::vector<char> buffer(5);
-	buffer[0] = START_10H;
-	buffer[1] = code;
-	buffer[2] = m_clientAddr;
-	buffer[3] = buffer[1]+buffer[2];
-	buffer[4] = END_16H;
-	return buffer;
+	std::vector<char> packet(5);
+	packet[0] = START_10H;
+	packet[1] = code;
+	packet[2] = m_clientAddr;
+	packet[3] = packet[1]+packet[2];
+	packet[4] = END_16H;
+	return packet;
 }
 
 
 // 对时
 std::vector<char> Service::CmdSetTimeStamp()
 {
-	std::vector<char> buffer(21);
+	std::vector<char> packet(21);
 
 	struct timeval cur_t;
 	gettimeofday(&cur_t,NULL);
@@ -400,6 +411,7 @@ std::vector<char> Service::CmdSetTimeStamp()
 	timeByte.msec = cur_t.tv_usec/1000;
 	//printf("time_now:%d%d%d%d%d%d.%ld\n", 1900+p->tm_year, 1+p->tm_mon, p->tm_mday, p->tm_hour, p->tm_min, p->tm_sec, cur_t.tv_usec/1000);
 
+<<<<<<< HEAD
 	buffer[0] = START_68H;
 	buffer[1] = 0x0f;
 	buffer[2] = 0x0f;
@@ -422,6 +434,149 @@ std::vector<char> Service::CmdSetTimeStamp()
 	buffer[19] = SumCheck( &(buffer[4]), (uint8_t)buffer[1] );
 	buffer[20] = END_16H;
 	return buffer;
+=======
+	packet[0] = START_68H;
+	packet[1] = 0x0f;
+	packet[2] = 0x0f;
+	packet[3] = START_68H;
+	packet[4] = PRA_1|m_iec103CodeS2C.fcb|m_iec103CodeS2C.fcv|FNA_S2C_POSTDATA_4;
+	packet[5] = m_timeStampAddr;
+	packet[6] = ASDU6_TIMESTAMP;
+	packet[7] = 0x81;  //vsq
+	packet[8] = COT_S2C_TIMESTAMP;
+	packet[9] = m_timeStampAddr;   //ASDU_ADDR   0xFF=广播方式    装置地址=点对点方式
+	packet[10] = FUN_GLB;
+	packet[11] = 0x00;
+	packet[12] = ((char*)(&timeByte))[0];
+	packet[13] = ((char*)(&timeByte))[1];
+	packet[14] = ((char*)(&timeByte))[2];
+	packet[15] = ((char*)(&timeByte))[3];
+	packet[16] = ((char*)(&timeByte))[4];
+	packet[17] = ((char*)(&timeByte))[5];
+	packet[18] = ((char*)(&timeByte))[6];
+	packet[19] = SumCheck( &(packet[4]), (uint8_t)packet[1] );
+	packet[20] = END_16H;
+	return packet;
+}
+
+
+// 事件告警复归
+std::vector<char> Service::CmdResetEventAlarm()
+{
+	std::vector<char> packet(16);
+
+	packet[0] = START_68H;
+	packet[1] = 0x0a;
+	packet[2] = 0x0a;
+	packet[3] = START_68H;
+	packet[4] = PRA_1|m_iec103CodeS2C.fcb|m_iec103CodeS2C.fcv|FNA_S2C_POSTDATA_3;
+	packet[5] = m_clientAddr;
+	packet[6] = ASDU20_RESET;
+	packet[7] = 0x81;                  //vsq
+	packet[8] = COT_S2C_COMMON_ORDER;  //一般命令
+	packet[9] = m_clientAddr;
+	packet[10] = FUN_GLB;              //FUN
+	packet[11] = INF_RESET_ORDER;      //复归命令
+	packet[12] = 0x02;                 //DCO=1 跳 =2合  0，3未用
+	packet[13] = 0x00;                 //如果时点对点发送，从站响应报文附加信息SIN和此值相同
+	packet[14] = SumCheck( &(packet[4]), (uint8_t)packet[1] );
+	packet[15] = END_16H;
+	return packet;
+}
+
+
+// 定值下载
+std::vector<char> Service::CmdSettingDownload()
+{
+	std::vector<char> packet(26);
+
+	stDataUnit dataUnit;
+	dataUnit.groupNo = 1;
+	dataUnit.entryNo = 3;
+	dataUnit.datatype = 1;
+	dataUnit.kod = 1;
+	dataUnit.datatype = 7;
+	dataUnit.datasize = 4;
+	dataUnit.number = 1;
+
+	packet[0] = START_68H;
+	packet[1] = 0x14;
+	packet[2] = 0x14;
+	packet[3] = START_68H;
+	packet[4] = PRA_1|m_iec103CodeS2C.fcb|m_iec103CodeS2C.fcv|FNA_S2C_POSTDATA_3;
+	packet[5] = m_clientAddr;
+	packet[6] = ASDU10_SETTING;
+	packet[7] = 0x81;                    //vsq
+	packet[8] = COT_S2C_GENERAL_WRITE;   //通用分类写命令
+	packet[9] = m_clientAddr;
+	packet[10] = FUN_GEN;                //FUN
+	packet[11] = INF_CONFIRM_WRITE;      //INF
+	packet[12] = 0x03;                   //RII
+	packet[13] = 0x01;                   //通用分类标识符数目
+
+	packet[14] = ((char*)&dataUnit)[0];
+	packet[15] = ((char*)&dataUnit)[1];
+	packet[16] = ((char*)&dataUnit)[2];
+	packet[17] = ((char*)&dataUnit)[3];
+	packet[18] = ((char*)&dataUnit)[4];
+	packet[19] = ((char*)&dataUnit)[5];
+
+	packet[20] = 0x00;
+	packet[21] = 0x00;
+	packet[22] = 0xa0;
+	packet[23] = 0x41;
+
+	packet[24] = SumCheck( &(packet[4]), (uint8_t)packet[1] );
+	packet[25] = END_16H;
+	return packet;
+}
+
+
+// 定值修改
+std::vector<char> Service::CmdSettingModify()
+{
+	std::vector<char> packet(26);
+
+	stDataUnit dataUnit;
+	dataUnit.groupNo = 1;
+	dataUnit.entryNo = 3;
+	dataUnit.datatype = 1;
+	dataUnit.kod = 1;
+	dataUnit.datatype = 7;
+	dataUnit.datasize = 4;
+	dataUnit.number = 1;
+
+	packet[0] = START_68H;
+	packet[1] = 0x14;
+	packet[2] = 0x14;
+	packet[3] = START_68H;
+	packet[4] = PRA_1|m_iec103CodeS2C.fcb|m_iec103CodeS2C.fcv|FNA_S2C_POSTDATA_3;
+	packet[5] = m_clientAddr;
+	packet[6] = ASDU10_SETTING;
+	packet[7] = 0x81;                    //vsq
+	packet[8] = COT_S2C_GENERAL_WRITE;   //通用分类写命令
+	packet[9] = m_clientAddr;
+	packet[10] = FUN_GEN;                //FUN
+	packet[11] = INF_EXEC_WRITE;         //INF
+	packet[12] = 0x04;                   //RII
+	packet[13] = 0x01;                   //通用分类标识符数目
+
+	packet[14] = ((char*)&dataUnit)[0];
+	packet[15] = ((char*)&dataUnit)[1];
+	packet[16] = ((char*)&dataUnit)[2];
+	packet[17] = ((char*)&dataUnit)[3];
+	packet[18] = ((char*)&dataUnit)[4];
+	packet[19] = ((char*)&dataUnit)[5];
+
+	packet[20] = 0x00;
+	packet[21] = 0x00;
+	packet[22] = 0xa0;
+	packet[23] = 0x41;
+
+	packet[24] = SumCheck( &(packet[4]), (uint8_t)packet[1] );
+	packet[25] = END_16H;
+	return packet;
+>>>>>>> d5145ec17abff158ad4ef64531721a60fadcab11
 }
 
 // 事件告警复归
@@ -456,12 +611,13 @@ std::vector<char> Service::CmdResetEventAlarm()
 // 总召唤
 std::vector<char> Service::CmdGetAll()
 {
-	std::vector<char> buffer(15);
+	std::vector<char> packet(15);
 	static uint8_t scn = 1;
 	if(255 == scn)
 	{
 		scn = 1;
 	}
+<<<<<<< HEAD
 	buffer[0] = START_68H;
 	buffer[1] = 0x09;
 	buffer[2] = 0x09;
@@ -478,6 +634,24 @@ std::vector<char> Service::CmdGetAll()
 	buffer[13] = SumCheck( &(buffer[4]), (uint8_t)buffer[1] );
 	buffer[14] = END_16H;
 	return buffer;
+=======
+	packet[0] = START_68H;
+	packet[1] = 0x09;
+	packet[2] = 0x09;
+	packet[3] = START_68H;
+	packet[4] = PRA_1|m_iec103CodeS2C.fcb|m_iec103CodeS2C.fcv|FNA_S2C_POSTDATA_3;
+	packet[5] = m_clientAddr;
+	packet[6] = ASDU7_GETALL;
+	packet[7] = 0x81;                  //vsq
+	packet[8] = COT_S2C_GETALL_START;  //总召唤
+	packet[9] = m_clientAddr;
+	packet[10] = FUN_GLB;  // FUN
+	packet[11] = 0x00;
+	packet[12] = scn++;
+	packet[13] = SumCheck( &(packet[4]), (uint8_t)packet[1] );
+	packet[14] = END_16H;
+	return packet;
+>>>>>>> d5145ec17abff158ad4ef64531721a60fadcab11
 }
 
 /*
@@ -485,52 +659,76 @@ std::vector<char> Service::CmdGetAll()
  * @Param: groupNum要读的组号
  * @Return: 通用分类读命令字符串
  */
-std::vector<char> Service::CmdGetGroupValue(uint8_t groupNum)
+std::vector<char> Service::CmdGetGroupValue(uint8_t groupNo)
 {
-	std::vector<char> buffer(19);
-	buffer[0] = START_68H;
-	buffer[1] = 0x0D;
-	buffer[2] = 0x0D;
-	buffer[3] = START_68H;
-	buffer[4] = PRA_1|m_iec103CodeS2C.fcb|m_iec103CodeS2C.fcv|FNA_S2C_POSTDATA_3;
-	buffer[5] = m_clientAddr;
-	buffer[6] = ASDU21_GETGROUP;
-	buffer[7] = 0x81;  //vsq
-	buffer[8] = COT_S2C_GENERAL_READ;
-	buffer[9] = m_clientAddr;
-	buffer[10] = 0xFE;  // FUN
-	buffer[11] = 0xF1;
-	buffer[12] = 0x15;
-	buffer[13] = 0x01;
-	buffer[14] = groupNum;
-	buffer[15] = 0;
-	buffer[16] = 1;
-	buffer[17] = SumCheck( &(buffer[4]), (uint8_t)buffer[1] );
-	buffer[18] = END_16H;
-	return buffer;
+	std::vector<char> packet(19);
+	packet[0] = START_68H;
+	packet[1] = 0x0D;
+	packet[2] = 0x0D;
+	packet[3] = START_68H;
+	packet[4] = PRA_1|m_iec103CodeS2C.fcb|m_iec103CodeS2C.fcv|FNA_S2C_POSTDATA_3;
+	packet[5] = m_clientAddr;
+	packet[6] = ASDU21_GETGROUP;
+	packet[7] = 0x81;  //vsq
+	packet[8] = COT_S2C_GENERAL_READ;
+	packet[9] = m_clientAddr;
+	packet[10] = FUN_GEN;            //通用分类服务功能类型
+	packet[11] = INF_READ_GROUP;     //读一个组的全部条目的值或者属性
+	packet[12] = 0x15;               //返回信息标识符RII
+	packet[13] = 0x01;               //通用分类标识数目
+	packet[14] = groupNo;
+	packet[15] = 0;
+	packet[16] = KOD_1;
+	packet[17] = SumCheck( &(packet[4]), (uint8_t)packet[1] );
+	packet[18] = END_16H;
+	return packet;
 }
 
-uint8_t Service::SumCheck( const char* buffer, int32_t count )
+std::vector<char> Service::CmdGetEntryValue(uint8_t groupNo, uint8_t entryNo)
+{
+	std::vector<char> packet(19);
+	packet[0] = START_68H;
+	packet[1] = 0x0D;
+	packet[2] = 0x0D;
+	packet[3] = START_68H;
+	packet[4] = PRA_1|m_iec103CodeS2C.fcb|m_iec103CodeS2C.fcv|FNA_S2C_POSTDATA_3;
+	packet[5] = m_clientAddr;
+	packet[6] = ASDU21_GETGROUP;
+	packet[7] = 0x81;  //vsq
+	packet[8] = COT_S2C_GENERAL_READ;
+	packet[9] = m_clientAddr;
+	packet[10] = FUN_GEN;            //通用分类服务功能类型
+	packet[11] = INF_READ_EBTRY;     //读一个组的全部条目的值或者属性
+	packet[12] = 0x15;               //返回信息标识符RII
+	packet[13] = 0x01;               //通用分类标识数目
+	packet[14] = groupNo;
+	packet[15] = entryNo;
+	packet[16] = KOD_1;
+	packet[17] = SumCheck( &(packet[4]), (uint8_t)packet[1] );
+	packet[18] = END_16H;
+	return packet;
+}
+uint8_t Service::SumCheck( const char* packet, int32_t length )
 {
 	uint8_t result = 0;
-	for( int32_t i = 0; i < count; i++ )
+	for( int32_t i = 0; i < length; i++ )
 	{
-		result += buffer[i];
+		result += packet[i];
 	}
 	return result;
 }
 
 /*
  * @Desc: 解析ASDU44上送全遥信
- * @Param: buffer 开始地址
- * @Param: count 开始地址
+ * @Param: packet 开始地址
+ * @Param: length 开始地址
  */
-void Service::ParseASDU44(const char* buffer, int32_t count)
+void Service::ParseASDU44(const char* packet, int32_t length)
 {
-	uint8_t clientAddr = buffer[5];
-	uint8_t vsq = buffer[7];
-	uint8_t fun = buffer[10];
-	uint8_t inf = buffer[11];
+	uint8_t clientAddr = packet[5];
+	uint8_t vsq = packet[7];
+	uint8_t fun = packet[10];
+	uint8_t inf = packet[11];
 	uint8_t scdNum = vsq & 0x7F; // 信息元个数
     bool bValue = false;
     char addr[100] = {0}; //103地址
@@ -539,8 +737,8 @@ void Service::ParseASDU44(const char* buffer, int32_t count)
     {
     	memset(addr, 0, sizeof(addr));
     	//信息元
-		uint8_t pScd = buffer[12 + i*5];
-		uint8_t qds = buffer[16 + i*5]; //品质描述字节
+		uint8_t pScd = packet[12 + i*5];
+		uint8_t qds = packet[16 + i*5]; //品质描述字节
 		if(qds & 0x80) //当前值无效
 		{
 			++inf;
@@ -574,15 +772,15 @@ void Service::ParseASDU44(const char* buffer, int32_t count)
 
 /*
  * @Desc: 解析ASDU40上送变位遥信
- * @Param: buffer 开始地址
- * @Param: count 开始地址
+ * @Param: packet 开始地址
+ * @Param: length 开始地址
  */
-void Service::ParseASDU40(const char* buffer, int32_t count)
+void Service::ParseASDU40(const char* packet, int32_t length)
 {
-	uint8_t clientAddr = buffer[5];
-	uint8_t fun = buffer[10];
-	uint8_t inf = buffer[11];
-	uint8_t siq = buffer[12]; //带品质描述的单点信息字节
+	uint8_t clientAddr = packet[5];
+	uint8_t fun = packet[10];
+	uint8_t inf = packet[11];
+	uint8_t siq = packet[12]; //带品质描述的单点信息字节
 	bool bValue = false;
 	char addr[100] = {0}; //103地址
 	std::vector<Tag> vecTag;
@@ -615,27 +813,27 @@ void Service::ParseASDU40(const char* buffer, int32_t count)
 
 /*
  * @Desc: 解析ASDU44上送SOE
- * @Param: buffer 开始地址
- * @Param: count 开始地址
+ * @Param: packet 开始地址
+ * @Param: length 开始地址
  * @Return: 较验码
  */
-void Service::ParseASDU41(const char* buffer, int32_t count)
+void Service::ParseASDU41(const char* packet, int32_t length)
 {
-	ParseASDU40(buffer, count);
+	ParseASDU40(packet, length);
 }
 
-void Service::ParseASDU42(const char* buffer, int32_t count)
+void Service::ParseASDU42(const char* packet, int32_t length)
 {
-	uint8_t vsq = buffer[VSQ_POSI];
-	uint8_t clientAddr = buffer[ADDR_POSI];
-	uint8_t fun = buffer[FUN_POSI];;
-	uint8_t inf = buffer[INF_POSI];
+	uint8_t vsq = packet[VSQ_POSI];
+	uint8_t clientAddr = packet[ADDR_POSI];
+	uint8_t fun = packet[FUN_POSI];;
+	uint8_t inf = packet[INF_POSI];
 	uint8_t dpiNum = vsq & 0x7F; 	// 信息元个数
 
     std::vector<Tag> vecTag;
     for(int i = 0; i < dpiNum; ++i)
     {
-		uint8_t dpi = buffer[DPI_POSI + i]; //品质描述的双点信息
+		uint8_t dpi = packet[DPI_POSI + i]; //品质描述的双点信息
 
 		if(!((dpi == 0x01) || (dpi == 0x02))) //当前值无效  dpi为2位数组，值=0/3为无意义，值=1为分，值=2为合
 		{
@@ -665,15 +863,15 @@ void Service::ParseASDU42(const char* buffer, int32_t count)
 
 /*
  * @Desc: 解析ASDU50遥测上送
- * @Param: buffer 开始地址
- * @Param: count 开始地址
+ * @Param: packet 开始地址
+ * @Param: length 开始地址
  */
-void Service::ParseASDU50(const char* buffer, int32_t count)
+void Service::ParseASDU50(const char* packet, int32_t length)
 {
-	uint8_t vsq = buffer[VSQ_POSI];
-	uint8_t clientAddr = buffer[ADDR_POSI];
-	uint8_t fun = buffer[FUN_POSI];
-	uint8_t inf = buffer[INF_POSI];
+	uint8_t vsq = packet[VSQ_POSI];
+	uint8_t clientAddr = packet[ADDR_POSI];
+	uint8_t fun = packet[FUN_POSI];
+	uint8_t inf = packet[INF_POSI];
 	uint8_t scdNum = vsq & 0x7F; // 信息元个数
 	float value = 0.0f;
 	char addr[100] = {0}; //103地址
@@ -682,8 +880,8 @@ void Service::ParseASDU50(const char* buffer, int32_t count)
 	{
 		memset(addr, 0, sizeof(addr));
 		//信息元
-		uint8_t qds = buffer[12 + i*2];
-		uint16_t tmpValue = buffer[12 + i*2];
+		uint8_t qds = packet[12 + i*2];
+		uint16_t tmpValue = packet[12 + i*2];
 		if(qds & 0x02) //当前值无效
 		{
 			++inf;
@@ -721,21 +919,21 @@ void Service::ParseASDU50(const char* buffer, int32_t count)
 
 /*
  * @Desc: 解析ASDU1遥信变位上送
- * @Param: buffer 开始地址
- * @Param: count 开始地址
+ * @Param: packet 开始地址
+ * @Param: length 开始地址
  */
-void Service::ParseASDU1(const char* buffer, int32_t count)
+void Service::ParseASDU1(const char* packet, int32_t length)
 {
-	uint8_t code = buffer[CODE_POSI];
-	uint8_t clientAddr = buffer[ADDR_POSI];
-	uint8_t fun = buffer[FUN_POSI];
-	uint8_t inf = buffer[INF_POSI];
+	uint8_t code = packet[CODE_POSI];
+	uint8_t clientAddr = packet[ADDR_POSI];
+	uint8_t fun = packet[FUN_POSI];
+	uint8_t inf = packet[INF_POSI];
 
 
 	char addr[100] = {0}; //103地址
 	std::vector<Tag> vecTag;
 	stTime7Byte Time4Byte;
-	memcpy(&Time4Byte, buffer + ASDU_1_TIMESTAMP, 4);  //取四字节时间
+	memcpy(&Time4Byte, packet + ASDU_1_TIMESTAMP, 4);  //取四字节时间
 	printf("%d:%d:%d\n",Time4Byte.hour,Time4Byte.min,Time4Byte.msec);
 
 	if(code & ACD_1)
@@ -753,7 +951,7 @@ void Service::ParseASDU1(const char* buffer, int32_t count)
 	{
 		uint16_t addrLen = (strGlgAddr.length() > sizeof(tagTemp.pName))? sizeof(tagTemp.pName): strGlgAddr.length();
 		memcpy(tagTemp.pName, strGlgAddr.c_str(), addrLen);
-		sprintf(tagTemp.pdata, "%d", (buffer[DPI_POSI] - 1) & 0x01);  //双点描述 dpi=1为分，=2为和   0和3无意义
+		sprintf(tagTemp.pdata, "%d", (packet[DPI_POSI] - 1) & 0x01);  //双点描述 dpi=1为分，=2为和   0和3无意义
 		vecTag.push_back(tagTemp);
 		std::cout<<"save Mem database tagName ="<<tagTemp.pName<<" tagValue ="<<tagTemp.pdata<<std::endl;
 		bool rs =MemCache::GetInstance()->WritePointsValue_V(vecTag); //更新点到内存数据库
@@ -763,21 +961,21 @@ void Service::ParseASDU1(const char* buffer, int32_t count)
 
 /*
  * @Desc: 解析ASDU2事故报文上送
- * @Param: buffer 开始地址
- * @Param: count 开始地址
+ * @Param: packet 开始地址
+ * @Param: length 开始地址
  */
-void Service::ParseASDU2(const char* buffer, int32_t count)
+void Service::ParseASDU2(const char* packet, int32_t length)
 {
-	uint8_t code = buffer[CODE_POSI];
-	uint8_t clientAddr = buffer[ADDR_POSI];
-	uint8_t fun = buffer[FUN_POSI];
-	uint8_t inf = buffer[INF_POSI];
-	uint8_t dpi = buffer[DPI_POSI] & 0x03;
+	uint8_t code = packet[CODE_POSI];
+	uint8_t clientAddr = packet[ADDR_POSI];
+	uint8_t fun = packet[FUN_POSI];
+	uint8_t inf = packet[INF_POSI];
+	uint8_t dpi = packet[DPI_POSI] & 0x03;
 
 	UnionConvert2Byte unionConvert;
-	memcpy(unionConvert.buf,buffer + RET_POSI, 2);
+	memcpy(unionConvert.buf,packet + RET_POSI, 2);
 	short ret = unionConvert.value;
-	memcpy(unionConvert.buf,buffer + FAN_POSI, 2);
+	memcpy(unionConvert.buf,packet + FAN_POSI, 2);
 	short fan = unionConvert.value;
 	printf("ret = %d  fan = %d\n",ret,fan);
 	bool bValue = false;
@@ -790,7 +988,7 @@ void Service::ParseASDU2(const char* buffer, int32_t count)
 	}
 
 	stTime7Byte Time4Byte;
-	memcpy(&Time4Byte, buffer + ASDU_2_TIMESTAMP, 4);  //取四字节时间
+	memcpy(&Time4Byte, packet + ASDU_2_TIMESTAMP, 4);  //取四字节时间
 	printf("%d:%d:%d\n",Time4Byte.hour,Time4Byte.min,Time4Byte.msec);
 	std::vector<Tag> vecTag;
 	if(2 == dpi)
@@ -933,39 +1131,47 @@ void * Service::ThreadFunc(void *arg)
 
 /*
  * @Desc: 解析通用分类数据响应（读目录，读一个组的描述，读一个组的值）
- * @Param: buffer 开始地址
- * @Param: count 开始地址
+ * @Param: packet 开始地址
+ * @Param: length 开始地址
  */
-void Service::ParseASDU10(const char* buffer, int32_t count)
+void Service::ParseASDU10(const char* packet, int32_t length)
 {
-	uint8_t fun = buffer[10];
-	uint8_t inf = buffer[11];
+	uint8_t fun = packet[FUN_POSI];
+	uint8_t inf = packet[INF_POSI];
 
-	if((0xFE == fun) && (0xF0 == inf)) //通用分类数据响应命令（装置响应的读目录）
+	if((FUN_GEN == fun) && (0xF0 == inf)) //通用分类数据响应命令（装置响应的读目录）
 	{
 
 	}
-	else if((0xFE == fun) && (0xF1 == inf)) //通用分类数据响应命令(读一个组的描述或值)
+	else if((FUN_GEN == fun) && (INF_READ_GROUP == inf)) //通用分类数据响应命令(读一个组的描述或值)
 	{
-		ParseASDU10AllValue(buffer, count);
+		ParseASDU10AllValue(packet, length);
 	}
-	else if((0xFE == fun) && (0xF4 == inf))     //ASDU10上送要测量
+	else if((FUN_GEN == fun) && (INF_READ_EBTRY == inf)) //通用分类数据响应命令(读一个条目的描述或值)
 	{
-
+		ParseASDU10AllValue(packet, length);
+	}
+	else if((FUN_GEN == fun) && (INF_CONFIRM_WRITE == inf)) //带确认的写条目响应
+	{
+		ParseASDU10AllValue(packet, length);
+	}
+	else if((FUN_GEN == fun) && (INF_EXEC_WRITE == inf))    //带执行的写条目响应
+	{
+		uint8_t rii = packet[RII_POSI];
 	}
 	else
 	{
-		WARN("unknown asdu10:%s", ToHexString(buffer, count).c_str());
+		WARN("unknown asdu10:%s", ToHexString(packet, length).c_str());
 		WarningLib::GetInstance()->WriteWarn2(WARNING_LV1, "received unknown asdu10");
 		return;
 	}
 }
 
-void Service::ParseASDU10AllValue(const char* buffer, int32_t count)
+void Service::ParseASDU10AllValue(const char* packet, int32_t length)
 {
-	uint8_t code = buffer[CODE_POSI];
-	uint8_t clientAddr = buffer[ADDR_POSI];
-	uint8_t ngdNum = buffer[NGD_POSI] & 0x3F; // 返回的数据个数
+	uint8_t code = packet[CODE_POSI];
+	uint8_t clientAddr = packet[ADDR_POSI];
+	uint8_t ngdNum = packet[NGD_POSI] & 0x3F; // 返回的数据个数
 	uint16_t offset = 0;                      //数据的偏移量
 	std::vector<Tag> vecTag;
 
@@ -978,7 +1184,7 @@ void Service::ParseASDU10AllValue(const char* buffer, int32_t count)
 	for(int i = 0; i < ngdNum; ++i)
 	{
 		stDataUnit dataUnit;
-		memcpy(&dataUnit, buffer + GROUP_POSI + offset, sizeof(stDataUnit));
+		memcpy(&dataUnit, packet + GROUP_POSI + offset, sizeof(stDataUnit));
 
 		char addr[100] = {0};
 		memset(addr, 0, sizeof(addr));
@@ -1008,32 +1214,32 @@ void Service::ParseASDU10AllValue(const char* buffer, int32_t count)
 		{
 		case 3:                                  //2字节无符号整形
 			tagTemp.dataType = TYPE_LONG;
-			memcpy(convertUnion2Byte.buf, buffer + GID_POSI + offset, dataUnit.datasize);
+			memcpy(convertUnion2Byte.buf, packet + GID_POSI + offset, dataUnit.datasize);
 			sprintf(tagTemp.pdata, "%u", convertUnion2Byte.uValue);
 			break;
 
 		case 7:                                   //短实数
 			tagTemp.dataType = TYPE_FLOAT;
-			memcpy(convertUnion4Byte.buf, buffer + GID_POSI + offset, dataUnit.datasize);
+			memcpy(convertUnion4Byte.buf, packet + GID_POSI + offset, dataUnit.datasize);
 			sprintf(tagTemp.pdata, "%.4f", convertUnion4Byte.fValue);
 			break;
 
 		case 9:                                   //双点描述 dpi=1为分，=2为和   0和3无意义
 			tagTemp.dataType = TYPE_BOOL;
-			if(!(((buffer + GID_POSI + offset)[0] == 0x01) || ((buffer + GID_POSI + offset)[0] == 0x02)))
+			if(!(((packet + GID_POSI + offset)[0] == 0x01) || ((packet + GID_POSI + offset)[0] == 0x02)))
 			{
 				break;
 			}
-			sprintf(tagTemp.pdata, "%d", ((buffer + GID_POSI + offset)[0] - 1) & 0x01);
+			sprintf(tagTemp.pdata, "%d", ((packet + GID_POSI + offset)[0] - 1) & 0x01);
 			break;
 
 		case 10:                               //单点描述 siq=0为分，=1为和
 			tagTemp.dataType = TYPE_BOOL;
-			if(!(((buffer + GID_POSI + offset)[0] == 0x00) || ((buffer + GID_POSI + offset)[0] == 0x01)))
+			if(!(((packet + GID_POSI + offset)[0] == 0x00) || ((packet + GID_POSI + offset)[0] == 0x01)))
 			{
 				break;
 			}
-			sprintf(tagTemp.pdata, "%d", (buffer + GID_POSI + offset)[0] & 0x01);
+			sprintf(tagTemp.pdata, "%d", (packet + GID_POSI + offset)[0] & 0x01);
 			break;
 
 		case 12:                           //带品质描述词的被测值
@@ -1068,3 +1274,6 @@ void Service::ParseASDU10AllValue(const char* buffer, int32_t count)
 		offset = offset + dataUnit.datasize + 6;  //通用分类数据单元占6个字节
 	}
 }
+
+
+

@@ -15,6 +15,13 @@
 
 using namespace std;
 
+
+
+
+#define CONFIRM_07H  0x07
+#define CONFIRM_0BH  0x0B
+
+
 class TcpService: public Service {
 public:
 	uint32_t GetSendID();
