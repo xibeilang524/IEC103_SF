@@ -16,14 +16,14 @@ enum ASDU_TYPE
 {
 	ASDU_1 = 0x01,
 	ASDU_2 = 0x02,
-	ASDU_10 = 0x0a,
+	ASDU_10 = 0x0A,
 	ASDU_40 = 0x28,
 	ASDU_41 = 0x29,
-	ASDU_42 = 0x2a,
-	ASDU_43 = 0x2b,
-	ASDU_44 = 0x2c,
-	ASDU_45 = 0x2d,
-	ASDU_46 = 0x2e,
+	ASDU_42 = 0x2A,
+	ASDU_43 = 0x2B,
+	ASDU_44 = 0x2C,
+	ASDU_45 = 0x2D,
+	ASDU_46 = 0x2E,
 	ASDU_50 = 0x32,
 };
 
@@ -71,18 +71,27 @@ enum ASDU_TYPE
 
 //ASDU号定义
 #define ASDU6_TIMESTAMP  6      // 对时
-#define ASDU7_GETALL     7      // 总召唤
-#define ASDU21_GETGROUP  21     // 总召唤
+#define ASDU7_GETALL     7      // 总召唤，遥信
+#define ASDU20_RESET     20     // 复归
+#define ASDU21_GETGROUP  21     // 总召唤，要测
 
 //COT传送原因定义
-#define COT_S2C_TIMESTAMP    8      //时间同步
-#define COT_S2C_GETALL_START 9      //总查询(总召唤)的启动
-#define COT_S2C_GENERAL_READ 0x2A   //通用分类读命令
+//控制方向
+#define COT_S2C_TIMESTAMP     8      //时间同步
+#define COT_S2C_GETALL_START  9      //总查询(总召唤)的启动
+#define COT_S2C_COMMON_ORDER  0x14   //一般命令
+#define COT_S2C_GENERAL_WRITE 0x28   //通用分类写命令
+#define COT_S2C_GENERAL_READ  0x2A   //通用分类读命令
+
+
+
 
 //FUN定义
-#define FUN_GETALL 255
+#define FUN_GLB 0xFF       //全局功能类型
+#define FUN_GEN 0xFE       //通用分类服务功能类型
 
 #define MAX_SIZE 1024
+
 
 typedef struct {
 	uint8_t fcb; // 桢记数位

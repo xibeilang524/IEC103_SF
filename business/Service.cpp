@@ -129,7 +129,9 @@ bool Service::Write()
 		strCmd = CmdResetCon();
 		break;
 	case CMD_RESET_TIMESTAMP:
-		strCmd = CmdGetTimeStamp();
+		strCmd = CmdSetTimeStamp();
+		break;
+	case CMD_RESET_EVENT:
 		break;
 	case CMD_GET_ALL:
 		strCmd = CmdGetAll();
@@ -381,7 +383,7 @@ std::vector<char> Service::CmdFixedData(uint8_t code)
 
 
 // 对时
-std::vector<char> Service::CmdGetTimeStamp()
+std::vector<char> Service::CmdSetTimeStamp()
 {
 	std::vector<char> buffer(21);
 
@@ -408,7 +410,7 @@ std::vector<char> Service::CmdGetTimeStamp()
 	buffer[7] = 0x81;  //vsq
 	buffer[8] = COT_S2C_TIMESTAMP;
 	buffer[9] = m_timeStampAddr;   //ASDU_ADDR   0xFF=广播方式    装置地址=点对点方式
-	buffer[10] = FUN_GETALL;
+	buffer[10] = FUN_GLB;
 	buffer[11] = 0x00;
 	buffer[12] = ((char*)(&timeByte))[0];
 	buffer[13] = ((char*)(&timeByte))[1];
@@ -419,6 +421,34 @@ std::vector<char> Service::CmdGetTimeStamp()
 	buffer[18] = ((char*)(&timeByte))[6];
 	buffer[19] = SumCheck( &(buffer[4]), (uint8_t)buffer[1] );
 	buffer[20] = END_16H;
+	return buffer;
+}
+
+// 事件告警复归
+std::vector<char> Service::CmdResetEventAlarm()
+{
+	std::vector<char> buffer(15);
+	static uint8_t scn = 1;
+	if(255 == scn)
+	{
+		scn = 1;
+	}
+	buffer[0] = START_68H;
+	buffer[1] = 0x0a;
+	buffer[2] = 0x0a;
+	buffer[3] = START_68H;
+	buffer[4] = PRA_1|m_iec103CodeS2C.fcb|m_iec103CodeS2C.fcv|FNA_S2C_POSTDATA_3;
+	buffer[5] = m_clientAddr;
+	buffer[6] = ASDU20_RESET;
+	buffer[7] = 0x81;                  //vsq
+	buffer[8] = COT_S2C_COMMON_ORDER;  //总召唤
+	buffer[9] = m_clientAddr;
+	buffer[10] = FUN_GEN;      // FUN
+	buffer[11] = 0x13;
+	buffer[12] = 0x02;         //DCO=1 跳 =2合  0，3未用
+	buffer[12] = 0x00;         //如果时点对点发送，从站响应报文附加信息SIN和此值相同
+	buffer[13] = SumCheck( &(buffer[4]), (uint8_t)buffer[1] );
+	buffer[14] = END_16H;
 	return buffer;
 }
 
@@ -442,7 +472,7 @@ std::vector<char> Service::CmdGetAll()
 	buffer[7] = 0x81;                  //vsq
 	buffer[8] = COT_S2C_GETALL_START;  //总召唤
 	buffer[9] = m_clientAddr;
-	buffer[10] = FUN_GETALL;  // FUN
+	buffer[10] = FUN_GLB;  // FUN
 	buffer[11] = 0x00;
 	buffer[12] = scn++;
 	buffer[13] = SumCheck( &(buffer[4]), (uint8_t)buffer[1] );

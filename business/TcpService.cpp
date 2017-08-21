@@ -281,7 +281,7 @@ std::vector<char> TcpService::CmdGetAll()
 	buffer[9] = 0x09;   		//COT传送	原因
 	buffer[10] = m_clientAddr;  //ASDU ADDR
 	buffer[11] = m_clientAddr;  //ASDU ADDR
-	buffer[12] = FUN_GETALL;
+	buffer[12] = FUN_GLB;
 	buffer[13] = 0x00 ;
 	buffer[14] = scn++;   		//scn
 
