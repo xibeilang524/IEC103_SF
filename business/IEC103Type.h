@@ -86,14 +86,11 @@ enum CMD_SEND
 //ASDU号定义
 #define ASDU6_TIMESTAMP  6      // 对时
 #define ASDU7_GETALL     7      // 总召唤，遥信
-<<<<<<< HEAD
 #define ASDU20_RESET     20     // 复归
 #define ASDU21_GETGROUP  21     // 总召唤，要测
-=======
 #define ASDU10_SETTING   10     // 定值
 #define ASDU20_RESET     20     // 复归
 #define ASDU21_GETGROUP  21     // 总召唤，遥测
->>>>>>> d5145ec17abff158ad4ef64531721a60fadcab11
 
 //COT传送原因定义
 //控制方向
@@ -103,17 +100,10 @@ enum CMD_SEND
 #define COT_S2C_GENERAL_WRITE 0x28   //通用分类写命令
 #define COT_S2C_GENERAL_READ  0x2A   //通用分类读命令
 
-<<<<<<< HEAD
-
-
-=======
->>>>>>> d5145ec17abff158ad4ef64531721a60fadcab11
-
 //FUN定义
 #define FUN_GLB 0xFF       //全局功能类型
 #define FUN_GEN 0xFE       //通用分类服务功能类型
-<<<<<<< HEAD
-=======
+
 
 //INF定义
 #define INF_RESET_ORDER   0x13  //复归命令，所有装置相同
@@ -121,7 +111,6 @@ enum CMD_SEND
 #define INF_READ_EBTRY    0xF4  //读一个条目的值或者属性
 #define INF_CONFIRM_WRITE 0xF9  //带确认的写条目
 #define INF_EXEC_WRITE    0xFA  //带执行的写条目
->>>>>>> d5145ec17abff158ad4ef64531721a60fadcab11
 
 #define MAX_SIZE 1024
 

@@ -411,30 +411,6 @@ std::vector<char> Service::CmdSetTimeStamp()
 	timeByte.msec = cur_t.tv_usec/1000;
 	//printf("time_now:%d%d%d%d%d%d.%ld\n", 1900+p->tm_year, 1+p->tm_mon, p->tm_mday, p->tm_hour, p->tm_min, p->tm_sec, cur_t.tv_usec/1000);
 
-<<<<<<< HEAD
-	buffer[0] = START_68H;
-	buffer[1] = 0x0f;
-	buffer[2] = 0x0f;
-	buffer[3] = START_68H;
-	buffer[4] = PRA_1|m_iec103CodeS2C.fcb|m_iec103CodeS2C.fcv|FNA_S2C_POSTDATA_4;
-	buffer[5] = m_timeStampAddr;
-	buffer[6] = ASDU6_TIMESTAMP;
-	buffer[7] = 0x81;  //vsq
-	buffer[8] = COT_S2C_TIMESTAMP;
-	buffer[9] = m_timeStampAddr;   //ASDU_ADDR   0xFF=广播方式    装置地址=点对点方式
-	buffer[10] = FUN_GLB;
-	buffer[11] = 0x00;
-	buffer[12] = ((char*)(&timeByte))[0];
-	buffer[13] = ((char*)(&timeByte))[1];
-	buffer[14] = ((char*)(&timeByte))[2];
-	buffer[15] = ((char*)(&timeByte))[3];
-	buffer[16] = ((char*)(&timeByte))[4];
-	buffer[17] = ((char*)(&timeByte))[5];
-	buffer[18] = ((char*)(&timeByte))[6];
-	buffer[19] = SumCheck( &(buffer[4]), (uint8_t)buffer[1] );
-	buffer[20] = END_16H;
-	return buffer;
-=======
 	packet[0] = START_68H;
 	packet[1] = 0x0f;
 	packet[2] = 0x0f;
@@ -576,37 +552,7 @@ std::vector<char> Service::CmdSettingModify()
 	packet[24] = SumCheck( &(packet[4]), (uint8_t)packet[1] );
 	packet[25] = END_16H;
 	return packet;
->>>>>>> d5145ec17abff158ad4ef64531721a60fadcab11
 }
-
-// 事件告警复归
-std::vector<char> Service::CmdResetEventAlarm()
-{
-	std::vector<char> buffer(15);
-	static uint8_t scn = 1;
-	if(255 == scn)
-	{
-		scn = 1;
-	}
-	buffer[0] = START_68H;
-	buffer[1] = 0x0a;
-	buffer[2] = 0x0a;
-	buffer[3] = START_68H;
-	buffer[4] = PRA_1|m_iec103CodeS2C.fcb|m_iec103CodeS2C.fcv|FNA_S2C_POSTDATA_3;
-	buffer[5] = m_clientAddr;
-	buffer[6] = ASDU20_RESET;
-	buffer[7] = 0x81;                  //vsq
-	buffer[8] = COT_S2C_COMMON_ORDER;  //总召唤
-	buffer[9] = m_clientAddr;
-	buffer[10] = FUN_GEN;      // FUN
-	buffer[11] = 0x13;
-	buffer[12] = 0x02;         //DCO=1 跳 =2合  0，3未用
-	buffer[12] = 0x00;         //如果时点对点发送，从站响应报文附加信息SIN和此值相同
-	buffer[13] = SumCheck( &(buffer[4]), (uint8_t)buffer[1] );
-	buffer[14] = END_16H;
-	return buffer;
-}
-
 
 // 总召唤
 std::vector<char> Service::CmdGetAll()
@@ -617,24 +563,6 @@ std::vector<char> Service::CmdGetAll()
 	{
 		scn = 1;
 	}
-<<<<<<< HEAD
-	buffer[0] = START_68H;
-	buffer[1] = 0x09;
-	buffer[2] = 0x09;
-	buffer[3] = START_68H;
-	buffer[4] = PRA_1|m_iec103CodeS2C.fcb|m_iec103CodeS2C.fcv|FNA_S2C_POSTDATA_3;
-	buffer[5] = m_clientAddr;
-	buffer[6] = ASDU7_GETALL;
-	buffer[7] = 0x81;                  //vsq
-	buffer[8] = COT_S2C_GETALL_START;  //总召唤
-	buffer[9] = m_clientAddr;
-	buffer[10] = FUN_GLB;  // FUN
-	buffer[11] = 0x00;
-	buffer[12] = scn++;
-	buffer[13] = SumCheck( &(buffer[4]), (uint8_t)buffer[1] );
-	buffer[14] = END_16H;
-	return buffer;
-=======
 	packet[0] = START_68H;
 	packet[1] = 0x09;
 	packet[2] = 0x09;
@@ -651,7 +579,6 @@ std::vector<char> Service::CmdGetAll()
 	packet[13] = SumCheck( &(packet[4]), (uint8_t)packet[1] );
 	packet[14] = END_16H;
 	return packet;
->>>>>>> d5145ec17abff158ad4ef64531721a60fadcab11
 }
 
 /*

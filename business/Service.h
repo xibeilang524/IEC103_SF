@@ -111,11 +111,6 @@ protected:
 	 */
 	 std::vector<char> CmdSetTimeStamp();
 
-	/*
-	 * @Desc: 事件告警复归
-	 * @Return:
-	 */
-	 std::vector<char> CmdResetEventAlarm();
 
 	/*
 	 * @Desc: 事件告警复归
@@ -255,23 +250,8 @@ private:
 	 */
 	bool StartBreakHeart();
     static void * ThreadFunc(void *arg);
-<<<<<<< HEAD
-protected:
-	enum CMD_SEND
-	{
-		CMD_RESET_CON,
-		CMD_RESET_NUM,
-		CMD_RESET_TIMESTAMP,
-		CMD_RESET_EVENT,
-		CMD_GET_ALL,
-		CMD_GET_DATA_LV1,
-		CMD_GET_DATA_LV2,
-		CMD_GENERAL_READ_YX_GROUP_VALUE,
-		CMD_GENERAL_READ_YC_GROUP_VALUE,
-	};
-=======
 
->>>>>>> d5145ec17abff158ad4ef64531721a60fadcab11
+
 protected:
 	struct Point103
 	{
